@@ -158,6 +158,9 @@ select option{background:#141415;color:#e9e7e2}
 .pn span{font-size:13px;color:var(--muted)}
 .per.now .pt{color:var(--accent)}
 .nowtag{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);padding:3px 8px;border-radius:999px}
+.tsel{display:inline-flex;align-items:center;gap:4px}
+.tsel b{font-weight:400;color:var(--dim)}
+.tsel .tl{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-right:2px}
 
 /* notes */
 #notes{width:100%;min-height:190px;resize:vertical;margin-top:14px;padding:14px;line-height:1.6;border-radius:8px}
@@ -270,12 +273,12 @@ select option{background:#141415;color:#e9e7e2}
             <select id="pDay" aria-label="Day" style="flex:0 1 90px">
               <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option><option value="4">Thu</option><option value="5">Fri</option>
             </select>
-            <input id="pStart" type="time" value="08:00" aria-label="Start" style="flex:0 1 110px" required>
-            <input id="pEnd" type="time" value="08:50" aria-label="End" style="flex:0 1 110px" required>
+            <span class="tsel"><span class="tl">From</span><select id="pSH" aria-label="Start hour"></select><b>:</b><select id="pSM" aria-label="Start minutes"></select></span>
+            <span class="tsel"><span class="tl">To</span><select id="pEH" aria-label="End hour"></select><b>:</b><select id="pEM" aria-label="End minutes"></select></span>
             <select class="mid" id="pCourse" aria-label="Course"></select>
-            <input id="pRoom" type="text" placeholder="Room" aria-label="Room" style="flex:0 1 90px">
             <button class="btn primary" type="submit">Add</button>
           </form>
+          <p class="hint" id="pMsg" role="status"></p>
         </details>
       </section>
 
@@ -383,6 +386,7 @@ function normalize(d){
   b.widgets=Object.assign(b.widgets,d.widgets||{});
   ["courses","schedule","tasks","grades"].forEach(function(k){b[k]=Array.isArray(d[k])?d[k]:[]});
   b.courses=b.courses.map(function(c){return {id:c.id,code:c.code,name:c.name}});
+  b.schedule=b.schedule.map(function(p){return {id:p.id,day:p.day,start:p.start,end:p.end,course:p.course}});
   b.grades=b.grades.map(function(g){
     var sc=(g.score===""||g.score==null||isNaN(+g.score))?"":+g.score;
     if(sc!==""&&+g.max>0&&+g.max!==100)sc=Math.round(sc/+g.max*1000)/10;
@@ -580,7 +584,7 @@ function renderSched(){
     var tip=openT.map(function(t){return typeOf(t).label+": "+t.title+(t.note?" — "+t.note:"")}).join("\n");
     return '<div class="per'+(live?" now":"")+(openT.length?" tint":"")+'"'+(openT.length?' style="--kr:'+typeOf(openT[0]).rgb+'" title="'+esc(tip)+'"':"")+'>'+
       '<div class="pt">'+esc(p.start)+'<br><span>'+esc(p.end)+'</span></div>'+
-      '<div class="pn"><b>'+esc(c?c.name:"Class")+'</b><span>'+esc(p.room||"")+'</span></div>'+
+      '<div class="pn"><b>'+esc(c?c.name:"Class")+'</b></div>'+
       (live?'<span class="nowtag">Now</span>':'<span></span>')+
       '<button class="x" type="button" data-act="del-period" data-id="'+esc(p.id)+'" aria-label="Delete class period">×</button></div>';
   }).join("");
@@ -680,10 +684,23 @@ $("#gradeForm").addEventListener("submit",function(e){
   $("#gTitle").value="";$("#gScore").value="";
   renderGrades();renderStats();touch();$("#gTitle").focus();
 });
+function timeSelects(){
+  var H="",M="";
+  for(var h=8;h<=16;h++)H+='<option value="'+pad(h)+'">'+pad(h)+'</option>';
+  for(var m=0;m<60;m+=10)M+='<option value="'+pad(m)+'">'+pad(m)+'</option>';
+  ["#pSH","#pEH"].forEach(function(s){$(s).innerHTML=H});
+  ["#pSM","#pEM"].forEach(function(s){$(s).innerHTML=M});
+  $("#pSH").value="08";$("#pSM").value="00";$("#pEH").value="08";$("#pEM").value="50";
+}
+timeSelects();
 $("#periodForm").addEventListener("submit",function(e){
   e.preventDefault();
-  S.schedule.push({id:uid(),day:+$("#pDay").value,start:$("#pStart").value,end:$("#pEnd").value,course:$("#pCourse").value,room:$("#pRoom").value.trim()});
-  selDay=+$("#pDay").value;$("#pRoom").value="";
+  var st=$("#pSH").value+":"+$("#pSM").value,en=$("#pEH").value+":"+$("#pEM").value;
+  if(toMin(en)<=toMin(st)){$("#pMsg").textContent="The end time must be after the start time.";return}
+  $("#pMsg").textContent="";
+  S.schedule.push({id:uid(),day:+$("#pDay").value,start:st,end:en,course:$("#pCourse").value});
+  selDay=+$("#pDay").value;
+  $("#pDay").value="1";$("#pCourse").value="";
   renderSched();renderStats();touch();
 });
 $("#notes").addEventListener("input",function(e){S.notes=e.target.value;touch()});
